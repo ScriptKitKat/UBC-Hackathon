@@ -1,4 +1,3 @@
-import type { InstrumentSymbol } from "@/shared";
 import type { MarketContract } from "@/features/markets";
 
 export interface NewsItem {
@@ -7,16 +6,6 @@ export interface NewsItem {
   readonly url?: string;
   readonly author?: string;
   readonly postedAt: Date;
-}
-
-export type Allowlist =
-  | { readonly kind: "allowAll" }
-  | { readonly kind: "only"; readonly symbols: ReadonlySet<InstrumentSymbol> };
-
-export const allowAll: Allowlist = { kind: "allowAll" };
-
-export function allowOnly(symbols: Iterable<InstrumentSymbol>): Allowlist {
-  return { kind: "only", symbols: new Set(symbols) };
 }
 
 export interface MatchCandidate {

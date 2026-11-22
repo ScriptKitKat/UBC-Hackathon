@@ -1,13 +1,12 @@
 import type { GeminiMarketsClient, MarketEvent, MarketsError } from "@/features/markets";
 import { profileNews } from "./keywords";
 import { compareCandidates, MIN_MATCH_SCORE, scoreContract } from "./score";
-import type { Allowlist, MatchCandidate, MatchResult, NewsItem } from "./types";
+import type { MatchCandidate, MatchResult, NewsItem } from "./types";
 
 const MAX_ALTERNATIVES = 3;
 
 export interface MatchOptions {
   readonly client: Pick<GeminiMarketsClient, "searchEvents">;
-  readonly allowlist: Allowlist;
 }
 
 function describeError(error: MarketsError): string {
@@ -60,17 +59,9 @@ export async function matchNews(news: NewsItem, options: MatchOptions): Promise<
   }
 
   const relevant = [...candidates.values()].filter((candidate) => candidate.score >= MIN_MATCH_SCORE);
-  if (relevant.length === 0) {
-    return noMatch(`No open contract is relevant enough to the post (searched: ${searched}).`);
-  }
-
-  const allowed =
-    options.allowlist.kind === "allowAll"
-      ? relevant
-      : relevant.filter((candidate) => options.allowlist.kind === "only" && options.allowlist.symbols.has(candidate.contract.instrumentSymbol));
-  const [best, ...rest] = allowed.sort(compareCandidates);
+  const [best, ...rest] = relevant.sort(compareCandidates);
   if (best === undefined) {
-    return noMatch("Relevant markets were found but none are on the allowlist.");
+    return noMatch(`No open contract is relevant enough to the post (searched: ${searched}).`);
   }
 
   return {

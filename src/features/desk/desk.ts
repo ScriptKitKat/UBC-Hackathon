@@ -12,7 +12,7 @@ import type { Reconciliation, SpendEntry, SpendJournal } from "@/features/journa
 import type { UsdcLedger } from "@/features/ledger";
 import { parseInstrumentSymbol } from "@/features/markets";
 import type { Candle, CandleTimeframe, ContractLimits, GeminiMarketsClient, MarketContract, MarketEvent } from "@/features/markets";
-import { allowAll, matchNews } from "@/features/matcher";
+import { matchNews } from "@/features/matcher";
 import type { MatchCandidate, MatchResult, NewsItem } from "@/features/matcher";
 import { aggregatePositions, buildPortfolio, fillsFromJournal, markFromContract, parsePortfolioRange, summarizeResearchSpend, todaysResearchSpendCents } from "@/features/positions";
 import type { MarketMark, PortfolioMarket } from "@/features/positions";
@@ -914,7 +914,7 @@ export function createDesk(deps: DeskDeps): Desk {
 
   return {
     async submitNews(news) {
-      const match = await matchNews(news, { client: markets, allowlist: allowAll });
+      const match = await matchNews(news, { client: markets });
       current = { news, match };
       if (match.kind === "matched") {
         for (const candidate of [match.best, ...match.alternatives]) {

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createGeminiMarketsClient } from "@/features/markets";
-import { instrumentSymbol } from "@/shared";
 import activeFixture from "./fixtures/events-active.json";
 import emptyFixture from "./fixtures/events-empty.json";
 import fedFixture from "./fixtures/events-fed.json";
 import { profileNews } from "./keywords";
-import { allowAll, allowOnly, matchNews, type NewsItem } from "./index";
+import { matchNews, type NewsItem } from "./index";
 
 function fixtureFor(search: string | null): unknown {
   const term = search?.toLowerCase() ?? "";
@@ -63,7 +62,7 @@ describe("matchNews", () => {
   it("matches a Fed post to a GEMI-FED261211 contract", async () => {
     const result = await matchNews(
       news("Powell signals the Fed will cut rates by 25bps at the December FOMC meeting"),
-      { client: buildClient(), allowlist: allowAll },
+      { client: buildClient() },
     );
     if (result.kind !== "matched") {
       throw new Error(result.reason);
@@ -77,7 +76,7 @@ describe("matchNews", () => {
   });
 
   it("returns only symbols that exist in the fetched markets", async () => {
-    const result = await matchNews(news("Fed holds rates steady"), { client: buildClient(), allowlist: allowAll });
+    const result = await matchNews(news("Fed holds rates steady"), { client: buildClient() });
     const known = new Set(
       fedFixture.data.flatMap((event) => event.contracts.map((contract) => contract.instrumentSymbol)),
     );
@@ -92,7 +91,6 @@ describe("matchNews", () => {
   it("returns no-match with a reason for an unrelated post", async () => {
     const result = await matchNews(news("Local bakery wins croissant of the year award"), {
       client: buildClient(),
-      allowlist: allowAll,
     });
     expect(result.kind).toBe("no-match");
     expect(result.kind === "no-match" && result.reason).toContain("No active markets found");
@@ -101,7 +99,6 @@ describe("matchNews", () => {
   it("returns no-match when markets are found but irrelevant", async () => {
     const result = await matchNews(news("Sunny weekend ahead"), {
       client: buildClient(() => fedFixture),
-      allowlist: allowAll,
     });
     expect(result).toEqual({
       kind: "no-match",
@@ -109,41 +106,12 @@ describe("matchNews", () => {
     });
   });
 
-  it("returns no-match when the best markets are not allowlisted", async () => {
-    const result = await matchNews(news("Fed expected to cut rates in December"), {
-      client: buildClient(),
-      allowlist: allowOnly([instrumentSymbol("GEMI-SOMETHING-ELSE")]),
-    });
-    expect(result).toEqual({
-      kind: "no-match",
-      reason: "Relevant markets were found but none are on the allowlist.",
-    });
-  });
-
-  it("treats an empty allowlist as allowing nothing", async () => {
-    const result = await matchNews(news("Fed expected to cut rates in December"), {
-      client: buildClient(),
-      allowlist: allowOnly([]),
-    });
-    expect(result.kind).toBe("no-match");
-  });
-
-  it("restricts matches to allowlisted symbols", async () => {
-    const allowed = instrumentSymbol("GEMI-FED261211-HIKE25");
-    const result = await matchNews(news("Fed expected to cut rates in December"), {
-      client: buildClient(),
-      allowlist: allowOnly([allowed]),
-    });
-    expect(result.kind === "matched" && result.best.contract.instrumentSymbol).toBe(allowed);
-    expect(result.kind === "matched" && result.alternatives).toEqual([]);
-  });
-
   it("reports search failures in the reason", async () => {
     const client = createGeminiMarketsClient({
       baseUrl: "https://example.test",
       fetch: (() => Promise.resolve(new Response("", { status: 503 }))),
     });
-    const result = await matchNews(news("Fed cut"), { client, allowlist: allowAll });
+    const result = await matchNews(news("Fed cut"), { client });
     expect(result).toEqual({ kind: "no-match", reason: "Market search failed (HTTP 503)." });
   });
 
@@ -152,7 +120,7 @@ describe("matchNews", () => {
       baseUrl: "https://example.test/RPC_SECRET_SENTINEL",
       fetch: (url) => Promise.reject(new Error(typeof url === "string" ? url : "RPC_SECRET_SENTINEL")),
     });
-    expect(await matchNews(news("Fed"), { client, allowlist: allowAll })).toEqual({
+    expect(await matchNews(news("Fed"), { client })).toEqual({
       kind: "no-match", reason: "Market search failed (network unavailable).",
     });
   });
@@ -163,14 +131,14 @@ describe("matchNews", () => {
       searches.push(search);
       return emptyFixture;
     });
-    await matchNews(news("alpha bravo charlie delta echo foxtrot golf"), { client, allowlist: allowAll });
+    await matchNews(news("alpha bravo charlie delta echo foxtrot golf"), { client });
     expect(searches).toHaveLength(3);
   });
 
   it("is deterministic", async () => {
     const text = "Fed expected to cut rates in December";
-    const a = await matchNews(news(text), { client: buildClient(), allowlist: allowAll });
-    const b = await matchNews(news(text), { client: buildClient(), allowlist: allowAll });
+    const a = await matchNews(news(text), { client: buildClient() });
+    const b = await matchNews(news(text), { client: buildClient() });
     expect(a).toEqual(b);
   });
 });
