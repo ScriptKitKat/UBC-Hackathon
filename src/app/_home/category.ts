@@ -10,3 +10,12 @@ export function categoryKey(filter: string, chip: string | undefined): string {
 export function cachedView<T>(cache: Readonly<Record<string, T>>, key: string): T | undefined {
   return cache[key];
 }
+
+export async function refreshHome(
+  refreshActive: () => Promise<void>,
+  prefetchCategory: (category: string) => Promise<void>,
+  shouldPrefetch: () => boolean,
+): Promise<void> {
+  await refreshActive();
+  if (shouldPrefetch()) await Promise.allSettled(PREFETCH_CATEGORIES.map(prefetchCategory));
+}
