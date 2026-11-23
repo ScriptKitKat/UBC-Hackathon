@@ -8,7 +8,7 @@ import type { HomeView } from "@/shared";
 import { usePolling } from "../_desk/use-polling";
 import { loadHome, loadSparklines, matchQuery } from "../_shell/api";
 import { ChevronIcon, RefreshIcon, SubmitIcon } from "../_shell/icons";
-import { CHIP_CATEGORIES, FILTERS, PREFETCH_CATEGORIES, categoryKey } from "./category";
+import { CHIP_CATEGORIES, FILTERS, categoryKey, refreshHome } from "./category";
 import { useWatchlist } from "../_watchlist/use-watchlist";
 import { MarketCard, MarketCardGrid, MarketCardSkeletonGrid } from "../_market-card/market-card";
 import { catalogCardModel } from "../_market-card/model";
@@ -68,33 +68,31 @@ export function HomePage({ initialView }: { readonly initialView?: HomeView } = 
     if (requestKey.current === key) setView(next);
   };
 
-  const prefetchCategories = () => {
-    void Promise.all(PREFETCH_CATEGORIES.map(async (name) => {
-      const prefetched = await loadHome({ sort: "moving", limit: 6, category: name });
-      if (prefetched.kind !== "ok") return;
-      setCache((current) => (current[name] === undefined ? { ...current, [name]: prefetched.view } : current));
-      if (requestKey.current === name) setView(prefetched.view);
-      const ready = await fillSparklines(prefetched.view);
-      remember(name, ready);
-    }));
+  const prefetchCategory = async (name: string) => {
+    const prefetched = await loadHome({ sort: "moving", limit: 6, category: name });
+    if (prefetched.kind !== "ok") return;
+    setCache((current) => (current[name] === undefined ? { ...current, [name]: prefetched.view } : current));
+    if (requestKey.current === name) setView(prefetched.view);
+    const ready = await fillSparklines(prefetched.view);
+    remember(name, ready);
   };
 
   usePolling(() => {
     const key = activeKey;
-    const queryCategory = category;
-    if (key === "All") prefetchCategories();
-    void loadHome({ sort: "moving", limit: 6, ...(queryCategory ? { category: queryCategory } : {}) }).then(async (result) => {
-      if (result.kind !== "ok") {
-        if (requestKey.current === key) setError(result.message);
-        return;
-      }
-      setError(null);
-      remember(key, result.view);
-      const filled = await fillSparklines(result.view);
-      remember(key, filled);
-    }).catch(() => {
-      if (requestKey.current === key) setError("Live markets are unavailable right now.");
-    });
+    const refreshActive = () => loadHome({ sort: "moving", limit: 6, ...(category ? { category } : {}) })
+      .then(async (result) => {
+        if (result.kind !== "ok") {
+          if (requestKey.current === key) setError(result.message);
+          return;
+        }
+        setError(null);
+        remember(key, result.view);
+        const filled = await fillSparklines(result.view);
+        remember(key, filled);
+      }).catch(() => {
+        if (requestKey.current === key) setError("Live markets are unavailable right now.");
+      });
+    void refreshHome(refreshActive, prefetchCategory, () => key === "All" && requestKey.current === key);
   }, POLL_MS + tick);
 
   const markets = view?.markets ?? [];
